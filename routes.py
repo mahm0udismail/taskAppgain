@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import Product, Order
 from app import db
 from services import validate_stock, process_payment, send_email
+import paypalrestsdk
 
 order_bp = Blueprint('orders', __name__)
 
@@ -17,25 +18,28 @@ def place_order():
         return jsonify({"error": "Insufficient stock"}), 400
 
     # Process payment
-    # payment_status = process_payment(data['payment_details'])
-    # if not payment_status:
-    #     return jsonify({"error": "Payment failed"}), 400
+    approval_url = process_payment({
+        "amount": data['payment_details']['amount'],
+        "product_id": product_id
+    })
 
-    # Update stock and save order
-    product = Product.query.get(product_id)
-    product.stock -= quantity
-    db.session.commit()
+    if not approval_url:
+        return jsonify({"error": "Payment initiation failed"}), 400
 
-    order = Order(product_id=product_id, quantity=quantity, email=customer_email)
+    # Create an order with "Pending" status
+    order = Order(product_id=product_id, quantity=quantity, email=customer_email, status="Pending")
     db.session.add(order)
     db.session.commit()
 
     # Send confirmation email
     # send_email(customer_email, order)
-
-    return jsonify({"message": "Order placed successfully", "order_id": order.id}), 201
-
-
+    
+    # Return approval URL for payment
+    return jsonify({
+        "message": "Order created successfully. Approve payment to proceed.",
+        "order_id": order.id,
+        "approval_url": approval_url
+    }), 201
 
 
 @order_bp.route('/products', methods=['GET'])
@@ -76,3 +80,24 @@ def get_all_orders():
         } for order in orders
     ]
     return jsonify(result)
+
+
+
+@order_bp.route('/payment/execute', methods=['POST'])
+def execute_payment():
+    payment_id = request.json.get('payment_id')
+    payer_id = request.json.get('payer_id')
+
+    payment = paypalrestsdk.Payment.find(payment_id)
+
+    if payment.execute({"payer_id": payer_id}):
+        # Update order status to "Completed"
+        order = Order.query.filter_by(id=request.json.get('order_id')).first()
+        if order:
+            order.status = "Completed"
+            db.session.commit()
+
+        return jsonify({"message": "Payment executed successfully", "order_id": order.id}), 200
+    else:
+        print(payment.error)  # Log error for debugging
+        return jsonify({"error": "Payment execution failed"}), 400
