@@ -1,5 +1,4 @@
 from models import Product
-from app import db, mail
 from flask_mail import Message
 import requests
 import paypalrestsdk
@@ -56,7 +55,9 @@ def process_payment(payment_details):
     
 
 
-def send_email(email, order):
+def send_email(email, order, mail):
+    from flask_mail import Message
+
     msg = Message(
         subject="Order Confirmation",
         recipients=[email],

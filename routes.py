@@ -32,7 +32,9 @@ def place_order():
     db.session.commit()
 
     # Send confirmation email
-    # send_email(customer_email, order)
+    from app import create_app
+    app = create_app()  # Create app to get 'mail' instance
+    send_email(customer_email, order, app.extensions['mail'])
     
     # Return approval URL for payment
     return jsonify({
@@ -96,7 +98,12 @@ def execute_payment():
         if order:
             order.status = "Completed"
             db.session.commit()
-
+        
+        customer_email=order.email
+        # Send confirmation email
+        from app import create_app
+        app = create_app()  # Create app to get 'mail' instance
+        send_email(customer_email, order, app.extensions['mail'])
         return jsonify({"message": "Payment executed successfully", "order_id": order.id}), 200
     else:
         print(payment.error)  # Log error for debugging
