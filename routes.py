@@ -3,10 +3,12 @@ from models import Product, Order
 from app import db
 from services import validate_stock, process_payment, send_email
 import paypalrestsdk
+from flask_jwt_extended import jwt_required
 
 order_bp = Blueprint('orders', __name__)
 
 @order_bp.route('/order', methods=['POST'])
+@jwt_required()
 def place_order():
     data = request.json
     product_id = data['product_id']
@@ -34,7 +36,7 @@ def place_order():
     # Send confirmation email
     from app import create_app
     app = create_app()  # Create app to get 'mail' instance
-    send_email(customer_email, order, app.extensions['mail'])
+    # send_email(customer_email, order, app.extensions['mail'])
     
     # Return approval URL for payment
     return jsonify({
@@ -45,6 +47,7 @@ def place_order():
 
 
 @order_bp.route('/products', methods=['GET'])
+@jwt_required()
 def get_all_products():
     products = Product.query.all()
     result = [
@@ -59,7 +62,9 @@ def get_all_products():
     return jsonify(result)
 
 @order_bp.route('/orders', methods=['GET'])
+@jwt_required()
 def get_all_orders():
+    print("in orders")
     # Query for all orders and join with products
     orders = db.session.query(
         Order.id,
@@ -86,6 +91,7 @@ def get_all_orders():
 
 
 @order_bp.route('/payment/execute', methods=['POST'])
+@jwt_required()
 def execute_payment():
     payment_id = request.json.get('payment_id')
     payer_id = request.json.get('payer_id')
@@ -103,7 +109,7 @@ def execute_payment():
         # Send confirmation email
         from app import create_app
         app = create_app()  # Create app to get 'mail' instance
-        send_email(customer_email, order, app.extensions['mail'])
+        # send_email(customer_email, order, app.extensions['mail'])
         return jsonify({"message": "Payment executed successfully", "order_id": order.id}), 200
     else:
         print(payment.error)  # Log error for debugging
