@@ -15,6 +15,9 @@ def create_app():
 
     # Add JWT Secret Key
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+    # Set JWT access token expiration to 1 day (24 hours)
+    from datetime import timedelta
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
     jwt = JWTManager(app)
 
     # Load environment variables from .env file
